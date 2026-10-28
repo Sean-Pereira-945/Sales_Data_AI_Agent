@@ -113,6 +113,10 @@ loading uses shimmer skeletons and a refetch keeps the previous data visible
   of a choropleth map.
 - **Also built (beyond the numbered spec sections):** report generation —
   Markdown + PDF with server-rendered charts and an LLM narrative (`/api/reports`
-  + "Generate report" dialog), Phase 5.
-- **Pending by design:** synthetic 1M-row scaling, benchmarks, evals and Docker
-  (Phase 6); the choropleth map as a visual enhancement.
+  + "Generate report" dialog), Phase 5; and Phase 6 — a latency benchmark
+  (`scripts/benchmark.py` → [SCALING.md](SCALING.md)), a 20-question eval harness
+  (`backend/evals/`), the root README, and Dockerfiles + docker-compose.
+- **Pending by design:** synthetic ~1M-row scale benchmarking (removed; future
+  work), the choropleth map as a visual enhancement, and the operational-hardening
+  backlog in [ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md) (least-privilege DB
+  role, API auth, externalized cache/report store).

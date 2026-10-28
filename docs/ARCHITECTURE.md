@@ -5,13 +5,18 @@ through it. Companion docs: [SCHEMA.md](SCHEMA.md) (raw tables),
 [DASHBOARD_SPEC.md](DASHBOARD_SPEC.md) (product spec),
 [API.md](API.md) (endpoint reference),
 [SPEC_COMPLIANCE.md](SPEC_COMPLIANCE.md) (spec → code status),
-[DECISIONS.md](DECISIONS.md) (why each choice).
+[DECISIONS.md](DECISIONS.md) (why each choice),
+[ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md) (standards/security/performance/loop-control review + fix plan).
 
-> **Status:** Phases 0–5 are built — schema discovery, the data layer + dashboard
+> **Status:** Phases 0–6 are built — schema discovery, the data layer + dashboard
 > API, the React dashboard UI, the LangGraph agent + SQL guard + CLI, the AI
 > features in the dashboard (per-chart insights, "Summarize dashboard", streaming
-> chat), and the report composer (Markdown + PDF). The scaling/eval/Docker work
-> (Phase 6) is the remaining phase — marked _(planned)_ below.
+> chat), the report composer (Markdown + PDF), and the eval/benchmark/Docker work
+> (a latency benchmark → [SCALING.md](SCALING.md), a 20-question eval harness, a
+> root README, and Dockerfiles + docker-compose for a one-command run).
+> Benchmarking at a synthetic ~1M-row scale is intentionally left as future work
+> (see [ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md) for the full hardening
+> backlog).
 
 ---
 
@@ -26,6 +31,16 @@ This keeps results trustworthy, cheap, and injection-resistant.
 ---
 
 ## 2. Layers
+
+High-level request path — the browser hits the FastAPI layer, which fans out to
+the LangGraph agent (chat) and the services (dashboard/reports); all SQL funnels
+through the `sqlglot` validator and a read-only, timeout-bounded DB session before
+reaching CockroachDB. Dashed = planned hardening (the least-privilege read-only
+role, see [ARCHITECTURE_REVIEW.md §2](ARCHITECTURE_REVIEW.md)).
+
+![Sales AI agent architecture: Browser UI → FastAPI → LangGraph agent + Services → Gemini LLM + sqlglot SQL validator → read-only DB session → CockroachDB (mart.* / olist.*)](sales_ai_agent_architecture.png)
+
+The module-level view of the same layers:
 
 ```
                     CockroachDB (defaultdb)
@@ -191,7 +206,7 @@ Nodes ([agent/nodes/](../backend/agent/nodes)):
 8. **insight_writer** → 2–3 sentence summary using only the analyzer's numbers
 
 **The LLM is provider-agnostic** ([agent/llm.py](../backend/agent/llm.py)): with
-`LLM_API_KEY` set it calls Anthropic (`LLM_MODEL`, default `claude-opus-5-5`);
+`LLM_API_KEY` set it calls Gemini (`LLM_MODEL`, default `gemini-2.5-flash`);
 without a key it falls back to a deterministic **stub** (keyword routing + SQL
 templates + templated insights) so the CLI and tests run offline. Try it:
 `python -m agent.cli "top 5 categories by revenue"`.
@@ -249,14 +264,20 @@ the dashboard's "Generate report" button hits the same builder with the current
 filters ([services/report_builder.py](../backend/services/report_builder.py),
 [api/reports.py](../backend/api/reports.py)).
 
-Pipeline: **plan sections** (rule-based, by topic keywords — e.g. a regional topic
-→ trend + revenue-by-state + late-by-state, capped at 5) → run the **deterministic
-chart queries** (reusing `services/charts`) → **render charts server-side** with
-matplotlib (Agg backend, no system deps) → write a **numbers-grounded narrative**
-per section + an **executive summary** (headline / 3 drivers / 1 risk / 1
-recommendation) → assemble **Markdown** (charts embedded as base64 PNGs, one
-self-contained file) and a **PDF** (matplotlib `PdfPages`: cover + one page per
-section).
+Pipeline: **plan sections dynamically** (`plan_report`) — with a live LLM the
+model outlines 3–6 sections tailored to the request, each either a **catalog**
+chart (reliable, pre-built) or a **custom** chart described by a precise data
+question; the deterministic keyword planner (`plan_sections`, capped at 5) is the
+guaranteed fallback when the LLM is unavailable or returns nothing usable. Then →
+run the queries: catalog sections reuse `services/charts`; **custom** sections
+have their SQL written by the LLM, pass the *same* `sql_validator` guard, and run
+read-only with a statement timeout (a rejected/empty one is skipped) → **render
+charts server-side** with matplotlib (Agg backend, no system deps) → write a
+**numbers-grounded narrative** per section + an **executive summary** (headline /
+3 drivers / 1 risk / 1 recommendation) → assemble **Markdown** (charts embedded as
+base64 PNGs, one self-contained file) and a **PDF** (matplotlib `PdfPages`: cover +
+one page per section). The LLM shapes *which* sections appear but never sees raw
+rows — every query is guarded and aggregated.
 
 `POST /api/reports` returns the report metadata + Markdown and URLs to download
 `GET /api/reports/{id}.pdf` and `.md`. Reports are held in an in-process store
@@ -291,4 +312,4 @@ section).
 | 3 | LangGraph agent + SQL guard + CLI | ✅ done |
 | 4 | AI insights + chat in the dashboard | ✅ done |
 | 5 | Report composer (Markdown + PDF) | ✅ done |
-| 6 | Synthetic 1M rows, benchmarks, evals, README, Docker | ⬜ planned |
+| 6 | Benchmarks, evals, README, Docker (synthetic 1M-row scaling → future work) | ✅ done |

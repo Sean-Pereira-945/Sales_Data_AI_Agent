@@ -158,12 +158,10 @@ columns).
 
 ### D19. Provider-agnostic LLM with an offline stub
 `agent/llm.py` reads `LLM_PROVIDER/MODEL/API_KEY` from `.env`. With a key it calls
-Anthropic (default `claude-opus-5-5`, overridable); with no key it falls back to a
-deterministic **stub** (keyword routing + SQL templates + templated insights) so
-the CLI and the whole test suite run offline. The stub is a test shim, not a
-second model — real NL→SQL quality is the Anthropic path. This keeps the project
-runnable and CI-testable without secrets, and swapping providers is a one-class
-change.
+Gemini; with no key it falls back to a deterministic **stub** (keyword routing +
+SQL templates + templated insights) so the CLI and the whole test suite run
+offline. The stub is a test shim, not a second model. This keeps the project
+runnable and CI-testable without secrets.
 
 ### D20. The LLM never does arithmetic — the analyzer does
 `analyzer` computes deltas, top-N, shares and first/last change in Python from the
@@ -217,11 +215,35 @@ own aggregations arranged into a document. Queries stay deterministic and the LL
 still only sees aggregated facts. The narrative per section and the executive
 summary are the only LLM calls.
 
-### D26. Rule-based section planner
+### D26. Rule-based section planner (deterministic floor)
 `plan_sections(topic)` maps topic keywords to an ordered, de-duplicated, capped
-(≤5) set of sections. Deterministic and defensible (no risk of the LLM inventing
-a section that has no query behind it); the LLM's judgment is spent on the prose,
-where it adds value. Easy to swap for an LLM planner later.
+(≤5) set of catalog sections. Deterministic and defensible (no risk of the LLM
+inventing a section that has no query behind it). It is the guaranteed fallback
+for the dynamic planner (D28) whenever the LLM is unavailable or returns nothing
+usable, so a report is always produced.
+
+### D28. Dynamic, request-driven report planner (supersedes the old one-chart path)
+The first Phase-5 cut had a fork: if an LLM key was present it produced a single
+LLM-generated custom chart (`_dynamic_section`); otherwise it used the catalog
+plan. In practice that collapsed every report to **one** section whenever any key
+was configured — weaker than the multi-section fallback and not actually tailored
+to the request.
+
+`plan_report(topic, filters)` replaces that fork. With a live LLM it outlines a
+mix of 3–6 sections (`REPORT_OUTLINE_SYSTEM`), each either a **catalog** chart
+(reliable, pre-built) or a **custom** chart described by a precise data question.
+`build_report` then materializes each: catalog sections reuse `services/charts`;
+custom sections have their SQL written by the LLM, pass the *same* `sql_validator`
+guard as every agent query, run read-only with a statement timeout, and only the
+small aggregated result is ever seen again. A custom query that is rejected or
+returns nothing is simply skipped; if the whole plan drops out, we fall back to
+`plan_sections` (D26). Custom sections are capped (`_MAX_CUSTOM = 3`) to bound
+latency.
+
+Why this shape: the LLM decides the report's *structure* (which angles, how many,
+reliable-vs-custom) — that's genuinely dynamic per request — while the core
+invariant holds (the LLM never reads raw rows; every query is guarded and
+aggregated), and determinism/availability are preserved by the catalog floor.
 
 ### D27. Self-contained Markdown + in-memory report store
 The Markdown embeds charts as base64 PNG data URIs so a single `.md` file is

@@ -25,7 +25,7 @@ Documentation for the Sales Intelligence Platform. Start here.
   and a side chat-panel placeholder. See [ARCHITECTURE.md §4a](ARCHITECTURE.md#4a-frontend-phase-2).
 - **Phase 3 — LangGraph agent:** NL→SQL→insight agent (router → schema →
   generator → `sqlglot` guard → executor with retry → analyzer → chart-spec →
-  insight), provider-agnostic LLM (Anthropic, with an offline stub), and a CLI
+  insight), Gemini LLM integration with an offline stub, and a CLI
   (`python -m agent.cli`). The SQL guard enforces single-statement, read-only,
   table/column-whitelist, LIMIT. See [ARCHITECTURE.md §4b](ARCHITECTURE.md#4b-the-agent-phase-3).
 
@@ -34,14 +34,17 @@ Documentation for the Sales Intelligence Platform. Start here.
   with conversation memory and inline charts — all via `api/insights.py` and
   `api/chat.py`. See [ARCHITECTURE.md §4c](ARCHITECTURE.md#4c-ai-in-the-dashboard-phase-4).
 
-- **Phase 5 — Reports:** a `report_composer` that plans sections by topic, runs
-  the deterministic queries, renders charts server-side (matplotlib), writes the
-  narrative, and exports **Markdown + PDF** — `POST /api/reports` + download
+- **Phase 5 — Reports:** a `report_composer` that plans sections dynamically from
+  the request (a per-request mix of reliable built-in charts and LLM-written
+  custom charts, with a deterministic keyword fallback), runs the guarded queries,
+  renders charts server-side (matplotlib), writes the narrative, and exports
+  **Markdown + PDF** — `POST /api/reports` + download
   endpoints, and a "Generate report" dialog in the UI. See
   [ARCHITECTURE.md §4d](ARCHITECTURE.md#4d-reports-phase-5).
 
-The remaining phase (synthetic 1M-row scaling, benchmarks, evals, Docker) is
-outlined in [ARCHITECTURE.md §6](ARCHITECTURE.md#6-phase-status) and [../PROMPTS.md](../PROMPTS.md).
+Phase 6 adds a latency benchmark (→ [SCALING.md](SCALING.md)), a 20-question eval
+harness, the root README, and Docker/compose. Benchmarking at a synthetic ~1M-row
+scale is left as future work; see [ARCHITECTURE.md §6](ARCHITECTURE.md#6-phase-status).
 
 ## Run it
 
@@ -62,8 +65,9 @@ npm run dev
 # → http://localhost:5173   (Vite proxies /api to the backend on :8000)
 ```
 
-**Agent CLI** (works offline with the stub; set `LLM_API_KEY`/`LLM_MODEL` in
-`.env` for real NL→SQL):
+**Agent CLI** (works offline with the stub; set `LLM_PROVIDER=gemini`,
+`LLM_API_KEY`, and `LLM_MODEL=gemini-2.5-flash` in `.env` for Gemini-powered
+NL→SQL):
 ```bash
 cd backend
 .venv/Scripts/python.exe -m agent.cli "top 5 categories by revenue"

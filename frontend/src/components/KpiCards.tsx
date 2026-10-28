@@ -1,4 +1,5 @@
-import { useKpis } from "../api/hooks";
+import { useState } from "react";
+import { useKpiInsight, useKpis } from "../api/hooks";
 import type { KpiCard } from "../api/types";
 import { fmtBRL, fmtDelta, fmtInt, fmtPct, fmtStars } from "../lib/format";
 import { Skeleton } from "./ui";
@@ -38,8 +39,9 @@ export function KpiCards() {
   const { cards, comparison_label } = q.data;
 
   return (
-    <div className="kpi-row">
-      {cards.map((card) => {
+    <>
+      <div className="kpi-row">
+        {cards.map((card) => {
         const up = card.delta_pct !== null && card.delta_pct >= 0;
         const positiveIsGood = card.key !== "aov" ? true : true; // all six: higher is better
         const good = card.delta_pct === null ? null : up === positiveIsGood;
@@ -57,9 +59,32 @@ export function KpiCards() {
               )}
             </div>
           </div>
-        );
-      })}
-      <div className="kpi-compare">vs {comparison_label ?? "—"}</div>
+          );
+        })}
+        <div className="kpi-compare">vs {comparison_label ?? "—"}</div>
+      </div>
+      <KpiInsight />
+    </>
+  );
+}
+
+function KpiInsight() {
+  const [open, setOpen] = useState(false);
+  const q = useKpiInsight(open);
+  return (
+    <div className="kpi-insight">
+      <span className="ai-badge">AI</span>
+      {!open ? (
+        <button className="ai-generate" type="button" onClick={() => setOpen(true)}>
+          What moved most?
+        </button>
+      ) : q.isPending ? (
+        <span className="ai-text ai-thinking">Analyzing KPIs…</span>
+      ) : q.isError ? (
+        <span className="ai-text">Couldn’t generate a KPI insight.</span>
+      ) : (
+        <span className="ai-text ai-filled">{q.data?.insight}</span>
+      )}
     </div>
   );
 }

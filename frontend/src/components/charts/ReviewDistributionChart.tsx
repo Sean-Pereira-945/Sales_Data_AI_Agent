@@ -44,6 +44,8 @@ export function ReviewDistributionChart() {
       }
       query={q}
       rows={rows}
+      insightId="review-distribution"
+      insightParams={{ view }}
     >
       {() =>
         view === "distribution" ? (

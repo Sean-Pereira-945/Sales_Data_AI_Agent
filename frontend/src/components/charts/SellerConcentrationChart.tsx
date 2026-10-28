@@ -43,6 +43,8 @@ export function SellerConcentrationChart() {
       }
       query={q}
       rows={data}
+      insightId="seller-concentration"
+      insightParams={{ buckets }}
     >
       {(d) => (
         <ResponsiveContainer width="100%" height={260}>

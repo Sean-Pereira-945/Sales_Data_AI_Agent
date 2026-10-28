@@ -171,3 +171,29 @@ already-aggregated rows; the insight writer is given those numbers and told to u
 only them. Non-additive measures (avg/rate/score/pct) are never summed — they're
 reported as a range. This is what makes insights trustworthy and is why the
 "LLM never reads raw rows" rule holds end to end.
+
+---
+
+## Phase 4 — AI in the dashboard
+
+### D21. Insights reuse the chart's own aggregated rows
+`services/insights.py` fetches a chart's insight from the **same** `services/charts`
+function the chart endpoint uses, then runs the shared `summarize_rows` analyzer
+and the insight writer. So the numbers in an insight are exactly the numbers on
+the chart, the "LLM never sees raw rows" rule holds, and insights are cached by
+`hash(chart_id + params)` — the scheme the spec asks for.
+
+### D22. Insights generate on demand, not on load
+Firing an LLM call for all 8 cards + KPIs on every load/filter change would be
+slow and costly. Each insight box has a "Generate insight" affordance; the call
+happens on click and is cached server-side. Correctness and cost both win.
+
+### D23. Chat streams via SSE, not token-by-token
+Our LLM wrapper is non-streaming, so `POST /api/chat` streams **graph progress**:
+one Server-Sent `status` event per node (routing → writing SQL → running query →
+…), then a single `final` event with the answer, SQL, optional chart spec and
+capped rows. This gives responsive feedback, keeps the agent's guard/executor in
+control, and lets the client render a chart inline. The endpoint is a sync
+generator so FastAPI runs it in a threadpool (the blocking LLM/DB calls don't
+stall the event loop). Conversation memory is the agent's checkpointer keyed by
+`thread_id`, returned in the final event and echoed back on the next turn.

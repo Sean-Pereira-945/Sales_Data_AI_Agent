@@ -7,10 +7,11 @@ through it. Companion docs: [SCHEMA.md](SCHEMA.md) (raw tables),
 [SPEC_COMPLIANCE.md](SPEC_COMPLIANCE.md) (spec → code status),
 [DECISIONS.md](DECISIONS.md) (why each choice).
 
-> **Status:** Phase 0 (schema discovery), Phase 1 (data layer + dashboard API),
-> Phase 2 (React dashboard UI), and Phase 3 (LangGraph agent + SQL guard + CLI)
-> are built. Wiring the agent into the dashboard (AI insights, chat), reports, and
-> the scaling/eval work are later phases — marked _(planned)_ below.
+> **Status:** Phases 0–4 are built — schema discovery, the data layer + dashboard
+> API, the React dashboard UI, the LangGraph agent + SQL guard + CLI, and the AI
+> features wired into the dashboard (per-chart insights, "Summarize dashboard",
+> and streaming chat). Reports and the scaling/eval work are later phases —
+> marked _(planned)_ below.
 
 ---
 
@@ -217,6 +218,30 @@ templates + templated insights) so the CLI and tests run offline. Try it:
   regex, is required to stop injection). LangGraph keeps the LLM boxed into exactly
   the steps we want while the guard and the database stay in control.
 
+## 4c. AI in the dashboard (Phase 4)
+
+The agent is wired into the dashboard through three endpoints
+([api/insights.py](../backend/api/insights.py), [api/chat.py](../backend/api/chat.py))
+and a service ([services/insights.py](../backend/services/insights.py)):
+
+- **Per-chart insight** — `GET /api/insights/{chart_id}` (same global filters +
+  the chart's local params). It fetches the **same aggregated rows the chart
+  shows**, runs the shared `summarize_rows` analyzer, and has the LLM write a
+  2–3 sentence insight. Cached by `hash(chart_id + params)`. There's also
+  `/api/insights/kpis`.
+- **Summarize dashboard** — `GET /api/insights/summary` gathers the KPI facts +
+  key-chart facts and returns a headline / 3 drivers / 1 risk / 1 recommendation.
+- **Chat** — `POST /api/chat` runs the agent and **streams SSE**: a `status`
+  event per graph node, then one `final` event with the answer, the validated
+  SQL, an optional `chart_spec` + capped rows (rendered inline), and the
+  `thread_id` (the agent's checkpointer gives follow-up memory).
+
+Frontend: the per-card insight box ([AiInsightBox](../frontend/src/components/AiInsightBox.tsx))
+and KPI insight generate **on demand** (one click) so a load or filter change
+doesn't fire an LLM call per card; the chat panel ([useChat](../frontend/src/hooks/useChat.ts))
+consumes the SSE stream and renders inline charts. Every insight still obeys the
+core rule — the LLM only ever sees aggregated numbers.
+
 ## 5. Configuration & security
 
 - All secrets come from `.env` (git-ignored); only `.env.example` is committed.
@@ -243,6 +268,6 @@ templates + templated insights) so the CLI and tests run offline. Try it:
 | 1 | `mart.*` + dashboard API + tests | ✅ done |
 | 2 | React/Vite dashboard UI | ✅ done |
 | 3 | LangGraph agent + SQL guard + CLI | ✅ done |
-| 4 | AI insights + chat in the dashboard | ⬜ planned |
+| 4 | AI insights + chat in the dashboard | ✅ done |
 | 5 | Report composer (Markdown + PDF) | ⬜ planned |
 | 6 | Synthetic 1M rows, benchmarks, evals, README, Docker | ⬜ planned |

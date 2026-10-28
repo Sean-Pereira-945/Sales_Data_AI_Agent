@@ -54,6 +54,8 @@ export function LateByStateChart() {
       }
       query={q}
       rows={rows}
+      insightId="late-by-state"
+      insightParams={{ min_orders: minOrders, sort }}
     >
       {(data) => (
         <ResponsiveContainer width="100%" height={260}>

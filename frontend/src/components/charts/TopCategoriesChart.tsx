@@ -56,6 +56,8 @@ export function TopCategoriesChart() {
       }
       query={q}
       rows={rows}
+      insightId="top-categories"
+      insightParams={{ top_n: topN, metric }}
     >
       {(data) => (
         <ResponsiveContainer width="100%" height={Math.max(220, data.length * 26)}>

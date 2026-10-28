@@ -25,6 +25,7 @@ export function DelayVsReviewChart() {
       query={q}
       rows={rows}
       isEmpty={(r) => r.every((x) => x.orders === 0)}
+      insightId="delay-vs-review"
     >
       {(data) => (
         <ResponsiveContainer width="100%" height={260}>

@@ -54,6 +54,8 @@ export function TrendChart() {
       }
       query={q}
       rows={rows}
+      insightId="trend"
+      insightParams={{ granularity }}
     >
       {(data) => (
         <ResponsiveContainer width="100%" height={260}>

@@ -75,6 +75,8 @@ export function PaymentMixChart() {
       }
       query={q}
       rows={rows}
+      insightId="payment-mix"
+      insightParams={{ view }}
     >
       {() =>
         view === "installments" ? (

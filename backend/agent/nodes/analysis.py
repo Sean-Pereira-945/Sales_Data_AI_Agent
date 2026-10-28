@@ -36,9 +36,14 @@ def _columns(rows: list[dict[str, Any]]) -> tuple[list[str], list[str], str | No
 
 
 def analyzer(state: AgentState) -> dict[str, Any]:
-    rows = state.get("result") or []
+    return {"analysis": summarize_rows(state.get("result") or [])}
+
+
+def summarize_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Deterministic facts from aggregated rows — shared by the graph analyzer
+    node and the dashboard insight endpoints. The LLM only ever sees these."""
     if not rows:
-        return {"analysis": {"facts": ["No rows matched the query."], "n_rows": 0}}
+        return {"facts": ["No rows matched the query."], "n_rows": 0}
 
     cols, numeric, label = _columns(rows)
     facts: list[str] = []
@@ -87,7 +92,7 @@ def analyzer(state: AgentState) -> dict[str, Any]:
             if _covers_black_friday(rows, label):
                 facts.append("Range includes Black Friday (24 Nov 2017).")
 
-    return {"analysis": {"facts": facts, **out}}
+    return {"facts": facts, **out}
 
 
 def chart_spec_node(state: AgentState) -> dict[str, Any]:

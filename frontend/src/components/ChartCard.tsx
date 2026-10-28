@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import type { QueryValue } from "../api/client";
+import { AiInsightBox } from "./AiInsightBox";
 import { EmptyState, ErrorState, Skeleton } from "./ui";
 
 /**
@@ -15,6 +17,8 @@ export function ChartCard<Row>({
   isEmpty,
   children,
   height = 260,
+  insightId,
+  insightParams,
 }: {
   title: string;
   subtitle?: string;
@@ -24,6 +28,8 @@ export function ChartCard<Row>({
   isEmpty?: (rows: Row[]) => boolean;
   children: (rows: Row[]) => ReactNode;
   height?: number;
+  insightId?: string;
+  insightParams?: Record<string, QueryValue>;
 }) {
   const empty = rows && (isEmpty ? isEmpty(rows) : rows.length === 0);
 
@@ -52,16 +58,7 @@ export function ChartCard<Row>({
         )}
       </div>
 
-      <AiInsight />
+      {insightId && <AiInsightBox chartId={insightId} params={insightParams} />}
     </section>
-  );
-}
-
-function AiInsight() {
-  return (
-    <div className="ai-insight" aria-label="AI insight (coming soon)">
-      <span className="ai-badge">AI</span>
-      <span className="ai-text">AI insight will appear here — generated from this chart’s aggregated data (Phase 4).</span>
-    </div>
   );
 }

@@ -116,6 +116,8 @@ class StubLLM:
             return self._chart_spec(user)
         if purpose == "insight":
             return self._insight(user)
+        if purpose == "summary":
+            return self._summary(user)
         return ""
 
     @staticmethod
@@ -156,6 +158,19 @@ class StubLLM:
         facts = (m.group(1).strip() if m else "").splitlines()
         head = facts[0] if facts else "No rows returned."
         return f"{head} (deterministic summary — set LLM_API_KEY in .env for AI-written insights.)"
+
+    @staticmethod
+    def _summary(user: str) -> str:
+        m = re.search(r"FACTS:\s*(.*)", user, re.DOTALL)
+        lines = [ln.strip("- ").strip() for ln in (m.group(1).strip().splitlines() if m else []) if ln.strip()]
+        drivers = lines[:3] or ["No data for the current filters."]
+        return (
+            "Headline: Dashboard summary for the current filters (deterministic — "
+            "set LLM_API_KEY in .env for an AI-written brief).\n"
+            "Drivers:\n" + "\n".join(f"- {d}" for d in drivers) + "\n"
+            "Risk: Review the partial-period and low-volume caveats before acting.\n"
+            "Recommendation: Open the chart with the largest movement to investigate."
+        )
 
 
 # --------------------------------------------------------------------------- #

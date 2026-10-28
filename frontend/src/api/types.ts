@@ -99,3 +99,34 @@ export interface SellerParetoRow {
   cum_gmv_pct: number | null;
   sellers: number;
 }
+
+export interface InsightResponse {
+  chart_id: string;
+  insight: string;
+  model: string;
+  facts: string[];
+}
+
+export interface SummaryResponse {
+  summary: string;
+  model: string;
+}
+
+export interface ChartSpec {
+  type: "line" | "bar" | "area" | "pie";
+  x: string;
+  y: string;
+  series: string | null;
+}
+
+// A streamed chat turn assembled on the client from SSE events.
+export interface ChatFinal {
+  type: "final";
+  thread_id: string;
+  intent: string | null;
+  sql: string | null;
+  insight: string;
+  chart_spec: ChartSpec | null;
+  row_count: number;
+  data: Record<string, unknown>[];
+}

@@ -48,6 +48,8 @@ export function RevenueByStateChart() {
       }
       query={q}
       rows={sorted}
+      insightId="revenue-by-state"
+      insightParams={{ metric }}
     >
       {(data) => (
         <ResponsiveContainer width="100%" height={260}>

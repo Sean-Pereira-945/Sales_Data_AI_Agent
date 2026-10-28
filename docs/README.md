@@ -29,8 +29,13 @@ Documentation for the Sales Intelligence Platform. Start here.
   (`python -m agent.cli`). The SQL guard enforces single-statement, read-only,
   table/column-whitelist, LIMIT. See [ARCHITECTURE.md §4b](ARCHITECTURE.md#4b-the-agent-phase-3).
 
-Later phases (AI insights & chat wired into the dashboard, reports, scaling/evals)
-are outlined in [ARCHITECTURE.md §6](ARCHITECTURE.md#6-phase-status) and [../PROMPTS.md](../PROMPTS.md).
+- **Phase 4 — AI in the dashboard:** per-chart + KPI AI insights (cached,
+  generated on demand), a "Summarize dashboard" brief, and a streaming chat panel
+  with conversation memory and inline charts — all via `api/insights.py` and
+  `api/chat.py`. See [ARCHITECTURE.md §4c](ARCHITECTURE.md#4c-ai-in-the-dashboard-phase-4).
+
+Later phases (reports, scaling/evals) are outlined in
+[ARCHITECTURE.md §6](ARCHITECTURE.md#6-phase-status) and [../PROMPTS.md](../PROMPTS.md).
 
 ## Run it
 

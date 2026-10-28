@@ -5,6 +5,7 @@ import type {
   ChartResponse,
   DelayReviewRow,
   FiltersMeta,
+  InsightResponse,
   InstallmentRow,
   KpiResponse,
   LateStateRow,
@@ -99,3 +100,28 @@ export const useSellerConcentration = (buckets: number) =>
     "/api/charts/seller-concentration",
     { buckets },
   );
+
+// ---- AI insights (Phase 4) ----
+const insightCommon = { staleTime: 5 * 60_000, retry: 0 } as const;
+
+/** Per-chart AI insight, computed from the same aggregated data the chart shows. */
+export function useChartInsight(chartId: string, local: Local = {}, enabled = true) {
+  const { filters } = useFilters();
+  const params = { ...filtersToParams(filters), ...local };
+  return useQuery({
+    queryKey: ["insight", chartId, filterKey(filters), local],
+    queryFn: () => getJson<InsightResponse>(`/api/insights/${chartId}`, params),
+    enabled,
+    ...insightCommon,
+  });
+}
+
+export function useKpiInsight(enabled = true) {
+  const { filters } = useFilters();
+  return useQuery({
+    queryKey: ["insight", "kpis", filterKey(filters)],
+    queryFn: () => getJson<InsightResponse>("/api/insights/kpis", filtersToParams(filters)),
+    enabled,
+    ...insightCommon,
+  });
+}

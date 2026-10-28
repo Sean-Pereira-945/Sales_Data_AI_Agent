@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useChat } from "../hooks/useChat";
 import { GlobalFilterBar } from "../components/GlobalFilterBar";
 import { KpiCards } from "../components/KpiCards";
 import { PartialPeriodWarning } from "../components/PartialPeriodWarning";
@@ -14,6 +15,12 @@ import { SellerConcentrationChart } from "../components/charts/SellerConcentrati
 
 export function Dashboard() {
   const [chatOpen, setChatOpen] = useState(false);
+  const chat = useChat();
+
+  const onSummarize = () => {
+    setChatOpen(true);
+    chat.summarize();
+  };
 
   return (
     <div className={chatOpen ? "app chat-open" : "app"}>
@@ -48,17 +55,23 @@ export function Dashboard() {
         </div>
 
         <div className="actions">
-          <button className="btn" type="button" disabled title="Phase 4">
+          <button className="btn" type="button" onClick={onSummarize} disabled={chat.busy}>
             Summarize dashboard
           </button>
           <button className="btn-ghost" type="button" disabled title="Phase 5">
             Generate report
           </button>
-          <span className="actions-note">AI summary &amp; reports arrive in Phases 4–5.</span>
+          <span className="actions-note">Reports arrive in Phase 5.</span>
         </div>
       </main>
 
-      <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+      <ChatPanel
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        messages={chat.messages}
+        busy={chat.busy}
+        onSend={chat.send}
+      />
     </div>
   );
 }

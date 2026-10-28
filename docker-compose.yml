@@ -1,0 +1,36 @@
+# One-command run:  docker compose up --build
+#
+# Brings up the FastAPI backend (:8000) and the nginx-served frontend (:8080,
+# which reverse-proxies /api to the backend). The CockroachDB cluster itself is
+# external (CockroachDB Cloud) — point DATABASE_URL at it in .env.
+#
+# CockroachDB uses sslmode=verify-full, so the cluster's CA cert must be mounted
+# into the backend at ~/.postgresql/root.crt. Put it at ./certs/root.crt or set
+# COCKROACH_CERT to its path:
+#   Windows: copy %APPDATA%\postgresql\root.crt  →  ./certs/root.crt
+#   macOS/Linux: cp ~/.postgresql/root.crt         →  ./certs/root.crt
+
+services:
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      # Ensure the driver finds the mounted cert regardless of home dir.
+      PGSSLROOTCERT: /root/.postgresql/root.crt
+    volumes:
+      - ${COCKROACH_CERT:-./certs/root.crt}:/root/.postgresql/root.crt:ro
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"

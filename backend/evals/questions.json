@@ -1,0 +1,107 @@
+{
+  "_comment": "Phase 6 eval set. Each item has a natural-language question and a ground-truth SQL whose RESULT the agent's answer is compared against (execution-based, not string match). Ground-truth SQL mirrors the agent's documented defaults: revenue-eligible statuses and the default date window (2017-01-01..2018-08-31) for metric questions; structural questions (distinct states/categories) are unfiltered.",
+  "default_date_from": "2017-01-01",
+  "default_date_to": "2018-08-31",
+  "questions": [
+    {
+      "id": "total_gmv",
+      "question": "What is the total GMV?",
+      "sql": "SELECT SUM(items_gmv) AS gmv FROM mart.order_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable')"
+    },
+    {
+      "id": "total_orders",
+      "question": "How many orders are there in total?",
+      "sql": "SELECT COUNT(*) AS orders FROM mart.order_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable')"
+    },
+    {
+      "id": "aov_overall",
+      "question": "What is the overall average order value?",
+      "sql": "SELECT SUM(items_gmv) / COUNT(*) AS aov FROM mart.order_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable')"
+    },
+    {
+      "id": "avg_review",
+      "question": "What is the average review score?",
+      "sql": "SELECT AVG(review_score) AS avg_review FROM mart.order_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable') AND review_score IS NOT NULL"
+    },
+    {
+      "id": "distinct_states",
+      "question": "How many distinct customer states are there?",
+      "sql": "SELECT COUNT(DISTINCT customer_state) AS states FROM mart.order_facts"
+    },
+    {
+      "id": "distinct_categories",
+      "question": "How many distinct product categories are there?",
+      "sql": "SELECT COUNT(DISTINCT category) AS categories FROM mart.order_item_facts"
+    },
+    {
+      "id": "top5_categories_gmv",
+      "question": "What are the top 5 categories by GMV?",
+      "sql": "SELECT category, SUM(gmv) AS gmv FROM mart.daily_sales WHERE date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable') GROUP BY category ORDER BY gmv DESC LIMIT 5"
+    },
+    {
+      "id": "gmv_by_month",
+      "question": "Show GMV by month.",
+      "sql": "SELECT purchase_month AS month, SUM(items_gmv) AS gmv FROM mart.order_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable') GROUP BY purchase_month ORDER BY purchase_month"
+    },
+    {
+      "id": "orders_by_month",
+      "question": "How many orders per month?",
+      "sql": "SELECT purchase_month AS month, COUNT(*) AS orders FROM mart.order_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable') GROUP BY purchase_month ORDER BY purchase_month"
+    },
+    {
+      "id": "top10_states_gmv",
+      "question": "What are the top 10 states by revenue?",
+      "sql": "SELECT customer_state AS state, SUM(items_gmv) AS gmv FROM mart.order_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable') GROUP BY customer_state ORDER BY gmv DESC LIMIT 10"
+    },
+    {
+      "id": "late_pct_overall",
+      "question": "What percentage of deliveries were late?",
+      "sql": "SELECT AVG(CASE WHEN is_late THEN 1.0 ELSE 0.0 END) AS late_rate FROM mart.order_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable') AND is_late IS NOT NULL"
+    },
+    {
+      "id": "review_by_delay_bucket",
+      "question": "What is the average review score by delivery-delay bucket?",
+      "sql": "SELECT delay_bucket, AVG(review_score) AS avg_review FROM mart.order_facts WHERE delay_bucket IS NOT NULL AND review_score IS NOT NULL GROUP BY delay_bucket ORDER BY avg_review DESC"
+    },
+    {
+      "id": "review_distribution",
+      "question": "What is the distribution of review scores?",
+      "sql": "SELECT review_score AS score, COUNT(*) AS reviews FROM mart.order_facts WHERE review_score IS NOT NULL GROUP BY review_score ORDER BY review_score"
+    },
+    {
+      "id": "payment_mix",
+      "question": "What is the mix of payment types by number of orders?",
+      "sql": "SELECT main_payment_type AS payment_type, COUNT(*) AS orders FROM mart.order_facts WHERE main_payment_type IS NOT NULL GROUP BY main_payment_type ORDER BY orders DESC"
+    },
+    {
+      "id": "active_sellers",
+      "question": "How many active sellers are there?",
+      "sql": "SELECT COUNT(DISTINCT seller_id) AS sellers FROM mart.order_item_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable')"
+    },
+    {
+      "id": "top5_sellers_gmv",
+      "question": "Who are the top 5 sellers by GMV?",
+      "sql": "SELECT seller_id, SUM(price) AS gmv FROM mart.order_item_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable') GROUP BY seller_id ORDER BY gmv DESC LIMIT 5"
+    },
+    {
+      "id": "gmv_sp",
+      "question": "What is the total GMV for the state of SP?",
+      "sql": "SELECT SUM(items_gmv) AS gmv FROM mart.order_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable') AND customer_state = 'SP'"
+    },
+    {
+      "id": "orders_2018",
+      "question": "How many orders were placed in 2018?",
+      "sql": "SELECT COUNT(*) AS orders FROM mart.order_facts WHERE purchase_date BETWEEN '2018-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable')"
+    },
+    {
+      "id": "avg_freight",
+      "question": "What is the average freight per order?",
+      "sql": "SELECT AVG(freight) AS avg_freight FROM mart.order_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable')"
+    },
+    {
+      "id": "avg_installments",
+      "question": "What is the average maximum number of installments per order?",
+      "sql": "SELECT AVG(max_installments) AS avg_installments FROM mart.order_facts WHERE purchase_date BETWEEN '2017-01-01' AND '2018-08-31' AND status NOT IN ('canceled','unavailable') AND max_installments IS NOT NULL"
+    }
+  ]
+}

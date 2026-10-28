@@ -1,0 +1,30 @@
+# Secrets — never commit
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+dist/
+.dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Build / reports output
+*.pdf
+!docs/**/*.pdf

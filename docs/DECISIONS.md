@@ -92,3 +92,42 @@ reuse. Interface (`get`/`set`/`cached`) is deliberately swappable for Redis late
   explicitly (`CAST(:buckets AS FLOAT)`).
 - `:name::TYPE` collides with SQLAlchemy's `:param` syntax — use `CAST(:name AS TYPE)`.
 - `DATE_TRUNC('week'|'month', date)` and `= ANY(:list)` work as in Postgres.
+
+---
+
+## Phase 2 — Dashboard UI
+
+### D11. Global filters in one context; local params per hook
+A single `FilterProvider` (React context + reducer) holds the global filters.
+Each chart's TanStack Query hook composes the global filters with its own local
+params and includes both in the query key, so one filter change invalidates and
+refetches every card consistently — no prop-drilling, no manual refresh wiring.
+
+### D12. `keepPreviousData` instead of spinners on refetch
+Query hooks use `placeholderData: keepPreviousData`, so changing a filter keeps
+the previous chart visible (dimmed with a small "refreshing" dot) rather than
+flashing a blank skeleton. First load still shows a shimmer skeleton. This is the
+spec's §10 "a refresh keeps the previous data visible".
+
+### D13. Vite dev proxy instead of CORS
+`vite.config.ts` proxies `/api` → the FastAPI backend, so the browser makes
+same-origin requests in dev and we avoid CORS entirely; the frontend code calls
+relative paths. Other environments set `VITE_API_BASE`. (The backend still sends
+permissive CORS headers for 5173 as a belt-and-braces fallback.)
+
+### D14. Fixed colour maps per dimension
+`lib/colors.ts` pins a colour to each payment type, delay bucket and review score
+so they read the same across every chart (spec §10). Arbitrary dimensions
+(states, sellers) draw from one shared categorical palette.
+
+### D15. Revenue-by-state as a bar, not a choropleth
+The spec allows "a sorted bar as fallback" for the Brazil map. We shipped the bar
+(correct, fast, no geo assets) and left the choropleth as a later visual
+enhancement — the data endpoint already returns per-state values keyed by the
+two-letter state code, so adding a map is purely front-end.
+
+### D16. Recharts + TanStack Query
+Recharts (declarative SVG, React-native) for charts and TanStack Query for
+server-state (caching, dedup, background refetch) — both named in CLAUDE.md.
+Pinned, ≥2-week-old versions. Bundle is ~610 kB (Recharts dominates); acceptable
+for an internal dashboard, and code-splittable later if needed.

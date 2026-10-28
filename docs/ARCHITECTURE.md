@@ -7,9 +7,9 @@ through it. Companion docs: [SCHEMA.md](SCHEMA.md) (raw tables),
 [SPEC_COMPLIANCE.md](SPEC_COMPLIANCE.md) (spec → code status),
 [DECISIONS.md](DECISIONS.md) (why each choice).
 
-> **Status:** Phase 0 (schema discovery) and Phase 1 (data layer + dashboard
-> API) are built. The frontend, the LangGraph agent, AI insights, reports, and
-> the scaling/eval work are later phases — marked _(planned)_ below.
+> **Status:** Phase 0 (schema discovery), Phase 1 (data layer + dashboard API),
+> and Phase 2 (React dashboard UI) are built. The LangGraph agent, AI insights,
+> reports, and the scaling/eval work are later phases — marked _(planned)_ below.
 
 ---
 
@@ -48,7 +48,7 @@ This keeps results trustworthy, cheap, and injection-resistant.
     app/main.py          FastAPI app + CORS
                               │  JSON
                               ▼
-    frontend/  React + Vite + TS, Recharts, TanStack Query   (planned, Phase 2)
+    frontend/  React + Vite + TS, Recharts, TanStack Query   ← dashboard UI
     agent/     LangGraph agent + guards/sql_validator.py     (planned, Phase 3)
 ```
 
@@ -116,6 +116,38 @@ Key safety properties:
 
 ---
 
+## 4a. Frontend (Phase 2)
+
+React + Vite + TypeScript SPA in [`frontend/`](../frontend), using **Recharts**
+for charts and **TanStack Query** for data fetching/caching.
+
+```
+frontend/src/
+  api/        client.ts (fetch) · types.ts · hooks.ts (one Query hook per endpoint)
+  state/      filters.tsx — global filter context (date/state/category/status)
+  lib/        format.ts (BRL, %, ★, periods) · colors.ts (fixed per-dimension palette)
+  components/ GlobalFilterBar · KpiCards · ChartCard (+ AI-insight placeholder)
+              ChatPanel (placeholder) · PartialPeriodWarning · ui.tsx (primitives)
+              charts/  one component per chart (1–8)
+  pages/      Dashboard.tsx — the §7 layout (filter bar · KPI row · 2-col grid · chat)
+```
+
+Key choices:
+- **Global filters** live in one context; every chart hook composes them with its
+  own local params, so changing a filter refetches every card. `keepPreviousData`
+  keeps the old chart visible while refetching (no blank flash — spec §10).
+- **Dev proxy:** `vite.config.ts` proxies `/api` → the FastAPI backend, so the
+  browser makes same-origin calls (no CORS in dev). In other environments set
+  `VITE_API_BASE`.
+- **Consistent colour** per payment type / delay bucket / review score across
+  charts (`lib/colors.ts`), BRL formatting everywhere, units in every title
+  (spec §10). Light/dark via CSS variables.
+- The per-card **AI-insight box** and the side **chat panel** are placeholders
+  wired to real behaviour in Phase 4.
+
+Run: `cd frontend && npm install && npm run dev` → http://localhost:5173
+(backend must be running on :8000).
+
 ## 5. Configuration & security
 
 - All secrets come from `.env` (git-ignored); only `.env.example` is committed.
@@ -137,7 +169,7 @@ Key safety properties:
 |---|---|---|
 | 0 | Schema discovery → SCHEMA.md | ✅ done |
 | 1 | `mart.*` + dashboard API + tests | ✅ done |
-| 2 | React/Vite dashboard UI | ⬜ planned |
+| 2 | React/Vite dashboard UI | ✅ done |
 | 3 | LangGraph agent + SQL guard + CLI | ⬜ planned |
 | 4 | AI insights + chat in the dashboard | ⬜ planned |
 | 5 | Report composer (Markdown + PDF) | ⬜ planned |

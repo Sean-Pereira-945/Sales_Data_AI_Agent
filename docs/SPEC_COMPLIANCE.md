@@ -60,7 +60,11 @@ all implemented; `GET /api/filters/meta` returns allowed values + date bounds.
 Local per-chart controls implemented (see §8). Local controls are additive and
 never override the global filters.
 
-## §7 Layout — ⬜ Phase 2 (frontend UI).
+## §7 Layout — ✅ (Phase 2)
+Built in `frontend/`: sticky global filter bar → KPI row (6 cards) → 2-column grid
+of all 8 charts → bottom actions (`Summarize dashboard` / `Generate report`,
+disabled until Phases 4–5) → slide-in side chat panel. Responsive (3/2/1-column
+KPI reflow; single-column charts on narrow screens).
 
 ## §8 Chart specifications
 | # | Chart | Data/API | Local controls | Notes |
@@ -68,7 +72,7 @@ never override the global filters.
 | — | KPI cards | ✅ | value + Δ% + period label | all six metrics; on-time % = 1−late% |
 | 1 | GMV & Orders trend | ✅ | granularity day/week/month ✅; GMV/Orders/AOV all returned for the toggle ✅ | dual-axis rendering = UI |
 | 2 | Top categories | ✅ | top_n 5/10/20 (any 1–50) ✅; metric gmv/orders/aov/avg_review ✅; min-30 on avg_review ✅ | horizontal bar = UI |
-| 3 | Revenue by state | ✅ | metric gmv/orders/aov/freight_pct ✅ | choropleth map = UI; sorted-bar data ready |
+| 3 | Revenue by state | 🟡 | metric gmv/orders/aov/freight_pct ✅ | sorted **bar** built (the spec's allowed fallback); choropleth map is a future enhancement |
 | 4 | Payment mix over time | ✅ | share/absolute/installments ✅ | share-vs-absolute is a UI render of the same rows |
 | 5 | ★ Delivery delay → review | ✅ | state & category via global filters | headline verified in data + tests |
 | 6 | Late % by state | ✅ | sort ✅; min_orders ✅ | delivery-days secondary axis = UI |
@@ -80,20 +84,24 @@ Insights from aggregated results only, numbers-grounded, cached by
 `hash(chart_id+params)`, "Summarize dashboard". (The result cache and the
 no-raw-rows data shape are already in place to support it.)
 
-## §10 UX standards — ⬜ Phase 2
-Titles with units, consistent colour per dimension, empty/loading/skeleton
-states, partial-period banner. Server-side support exists: every chart reports
-its `currency`/units in `meta`, empty filters return `"data": []` (not an error),
-and `partial_period` is surfaced.
+## §10 UX standards — ✅ (Phase 2)
+Implemented in the UI: every title carries its metric + unit (e.g. "GMV (R$),
+month"); consistent colour per payment type / delay bucket / review score across
+charts (`lib/colors.ts`); empty results show "No orders match these filters";
+loading uses shimmer skeletons and a refetch keeps the previous data visible
+(`keepPreviousData`); the partial-period banner shows when the range leaves
+2017-01-01…2018-08-31. BRL formatting throughout; light/dark via CSS variables.
 
 ---
 
 ## Summary
-- **Built & spec-compliant now:** all source/metric/data-quality rules (§2–§6),
-  and the data + API for every KPI and all 8 charts (§8).
+- **Built & spec-compliant now:** all source/metric/data-quality rules (§2–§6);
+  the data + API for every KPI and all 8 charts (§8); and the full dashboard UI —
+  layout (§7) and UX standards (§10).
 - **Deviations, all documented in DECISIONS.md:** rebuilt tables vs. matviews (D1);
   `daily_sales` grain + `purchase_month` (D5); source-table choices per the
   additive/distinct rule (D6); category semijoin semantics (D7); seller Pareto
-  `buckets` vs. slider.
-- **Pending by design:** visual layout & UX polish (Phase 2), AI insights & chat
-  (Phase 4), Black-Friday recognition (Phase 4), reports (Phase 5).
+  `buckets` vs. slider; revenue-by-state **bar** (spec's allowed fallback) instead
+  of a choropleth map.
+- **Pending by design:** AI insights, chat & Black-Friday recognition (Phase 4);
+  reports (Phase 5); the choropleth map as a visual enhancement.

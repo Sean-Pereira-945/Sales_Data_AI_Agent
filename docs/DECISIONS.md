@@ -131,3 +131,43 @@ Recharts (declarative SVG, React-native) for charts and TanStack Query for
 server-state (caching, dedup, background refetch) — both named in CLAUDE.md.
 Pinned, ≥2-week-old versions. Bundle is ~610 kB (Recharts dominates); acceptable
 for an internal dashboard, and code-splittable later if needed.
+
+---
+
+## Phase 3 — LangGraph agent
+
+### D17. LangGraph `StateGraph` over a hand-rolled loop
+The control flow is genuinely a graph: two bounded **retry loops**
+(validator→generator, executor→generator) and a graceful-fail path are
+conditional edges, and conversation memory is a checkpointer keyed by
+`thread_id`. A plain function pipeline would re-implement branching, retry
+counting, and session persistence by hand. A generic ReAct/tool-calling agent
+was rejected because letting the LLM pick tools freely fights the core guarantee
+that only validated SQL runs. See ARCHITECTURE.md §4b "Why LangGraph".
+
+### D18. The SQL guard parses with sqlglot, not regex
+`guards/sql_validator.py` enforces: single statement, SELECT/WITH only (reject any
+DDL/DML incl. `SELECT … INTO`), schema-qualified **table whitelist** (`mart.*` +
+read-only `olist.*`; CTE names excluded), a **column whitelist** (defense in
+depth), comment stripping, and an injected/clamped `LIMIT`. A real parser is what
+makes comment-smuggling and stacked statements detectable; regex can't. The table
+whitelist is what blocks "UNION into `information_schema`/`crdb_internal`". 20
+security tests cover the required vectors (DROP, multiple statements, comments,
+non-whitelisted tables, UNION into system tables, SELECT INTO, cross-DB, unknown
+columns).
+
+### D19. Provider-agnostic LLM with an offline stub
+`agent/llm.py` reads `LLM_PROVIDER/MODEL/API_KEY` from `.env`. With a key it calls
+Anthropic (default `claude-opus-5-5`, overridable); with no key it falls back to a
+deterministic **stub** (keyword routing + SQL templates + templated insights) so
+the CLI and the whole test suite run offline. The stub is a test shim, not a
+second model — real NL→SQL quality is the Anthropic path. This keeps the project
+runnable and CI-testable without secrets, and swapping providers is a one-class
+change.
+
+### D20. The LLM never does arithmetic — the analyzer does
+`analyzer` computes deltas, top-N, shares and first/last change in Python from the
+already-aggregated rows; the insight writer is given those numbers and told to use
+only them. Non-additive measures (avg/rate/score/pct) are never summed — they're
+reported as a range. This is what makes insights trustworthy and is why the
+"LLM never reads raw rows" rule holds end to end.

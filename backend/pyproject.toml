@@ -13,6 +13,8 @@ dependencies = [
     "pydantic-settings>=2.3",
     "python-dotenv>=1.0",
     "sqlglot>=25.0",
+    "langgraph>=0.2.40",
+    "anthropic>=0.40",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +38,7 @@ pythonpath = ["."]
 line-length = 100
 
 [tool.ruff.lint]
-# B008 fires on FastAPI's idiomatic Depends()/Query() in argument defaults,
-# which is the sanctioned pattern — allow it.
-ignore = ["B008"]
+# B008  — FastAPI's idiomatic Depends()/Query() in argument defaults.
+# ISC001/ISC004 — intentional multi-line string concatenation (SQL templates);
+#                 ISC001 also conflicts with the formatter.
+ignore = ["B008", "ISC001", "ISC004"]

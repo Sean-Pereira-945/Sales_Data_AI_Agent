@@ -23,9 +23,14 @@ Documentation for the Sales Intelligence Platform. Start here.
   Query) — global filter bar, KPI row, a 2-column grid of all 8 charts with their
   own local controls, partial-period warning, per-card AI-insight placeholders,
   and a side chat-panel placeholder. See [ARCHITECTURE.md §4a](ARCHITECTURE.md#4a-frontend-phase-2).
+- **Phase 3 — LangGraph agent:** NL→SQL→insight agent (router → schema →
+  generator → `sqlglot` guard → executor with retry → analyzer → chart-spec →
+  insight), provider-agnostic LLM (Anthropic, with an offline stub), and a CLI
+  (`python -m agent.cli`). The SQL guard enforces single-statement, read-only,
+  table/column-whitelist, LIMIT. See [ARCHITECTURE.md §4b](ARCHITECTURE.md#4b-the-agent-phase-3).
 
-Later phases (LangGraph agent, AI insights, reports, scaling/evals) are outlined
-in [ARCHITECTURE.md §6](ARCHITECTURE.md#6-phase-status) and [../PROMPTS.md](../PROMPTS.md).
+Later phases (AI insights & chat wired into the dashboard, reports, scaling/evals)
+are outlined in [ARCHITECTURE.md §6](ARCHITECTURE.md#6-phase-status) and [../PROMPTS.md](../PROMPTS.md).
 
 ## Run it
 
@@ -44,4 +49,12 @@ cd frontend
 npm install
 npm run dev
 # → http://localhost:5173   (Vite proxies /api to the backend on :8000)
+```
+
+**Agent CLI** (works offline with the stub; set `LLM_API_KEY`/`LLM_MODEL` in
+`.env` for real NL→SQL):
+```bash
+cd backend
+.venv/Scripts/python.exe -m agent.cli "top 5 categories by revenue"
+.venv/Scripts/python.exe -m agent.cli          # interactive REPL (keeps memory)
 ```

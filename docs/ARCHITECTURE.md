@@ -8,8 +8,9 @@ through it. Companion docs: [SCHEMA.md](SCHEMA.md) (raw tables),
 [DECISIONS.md](DECISIONS.md) (why each choice).
 
 > **Status:** Phase 0 (schema discovery), Phase 1 (data layer + dashboard API),
-> and Phase 2 (React dashboard UI) are built. The LangGraph agent, AI insights,
-> reports, and the scaling/eval work are later phases — marked _(planned)_ below.
+> Phase 2 (React dashboard UI), and Phase 3 (LangGraph agent + SQL guard + CLI)
+> are built. Wiring the agent into the dashboard (AI insights, chat), reports, and
+> the scaling/eval work are later phases — marked _(planned)_ below.
 
 ---
 
@@ -49,7 +50,8 @@ This keeps results trustworthy, cheap, and injection-resistant.
                               │  JSON
                               ▼
     frontend/  React + Vite + TS, Recharts, TanStack Query   ← dashboard UI
-    agent/     LangGraph agent + guards/sql_validator.py     (planned, Phase 3)
+    agent/     LangGraph agent (state·graph·nodes·llm·cli)    ← NL→SQL→insight
+    guards/    sql_validator.py (sqlglot guard)              ← security boundary
 ```
 
 Namespace packages (no `__init__.py`); modules resolve via `pythonpath = ["."]`
@@ -148,6 +150,73 @@ Key choices:
 Run: `cd frontend && npm install && npm run dev` → http://localhost:5173
 (backend must be running on :8000).
 
+## 4b. The agent (Phase 3)
+
+A **LangGraph** `StateGraph` turns a natural-language question into a validated
+SQL query, runs it against `mart.*`, analyses the aggregated rows in Python, and
+writes a numbers-grounded insight. One `AgentState` ([agent/state.py](../backend/agent/state.py))
+flows through every node; an in-memory checkpointer persists it per `thread_id`
+for follow-ups.
+
+```mermaid
+flowchart TD
+    Q([question]) --> R[intent_router]
+    R --> SC[schema_context]
+    SC --> G[sql_generator]
+    G --> V{{"sql_validator (sqlglot guard)"}}
+    V -->|ok| X{{"executor (read-only + timeout)"}}
+    V -->|"rejected, retry up to 3"| G
+    V -->|exhausted| F["fail gracefully"]
+    X -->|ok| A["analyzer: deltas, top-N, anomalies"]
+    X -->|"DB error, retry up to 3"| G
+    X -->|exhausted| F
+    A --> CS["chart_spec (when intent=chart)"]
+    CS --> I[insight_writer]
+    I --> E([answer + insight])
+    F --> E
+```
+
+Nodes ([agent/nodes/](../backend/agent/nodes)):
+1. **intent_router** → `qa | chart | summary | report`
+2. **schema_context** → injects the mart schema + metric rules (never the data)
+3. **sql_generator** → NL→SQL (LLM); on a retry it is re-fed the previous SQL + error
+4. **sql_validator** → the `sqlglot` guard ([guards/sql_validator.py](../backend/guards/sql_validator.py));
+   reject → back to the generator with the reason
+5. **executor** → read-only, `statement_timeout`; DB error → back to the generator
+   (both loops capped at 3 tries, then **fail** answers gracefully)
+6. **analyzer** → computes deltas / top-N / Black-Friday detection in **Python**
+   from the aggregated rows (the LLM does no arithmetic)
+7. **chart_spec** → validated `{type,x,y,series}` when the intent is a chart
+8. **insight_writer** → 2–3 sentence summary using only the analyzer's numbers
+
+**The LLM is provider-agnostic** ([agent/llm.py](../backend/agent/llm.py)): with
+`LLM_API_KEY` set it calls Anthropic (`LLM_MODEL`, default `claude-opus-5-5`);
+without a key it falls back to a deterministic **stub** (keyword routing + SQL
+templates + templated insights) so the CLI and tests run offline. Try it:
+`python -m agent.cli "top 5 categories by revenue"`.
+
+### Why LangGraph
+
+- **The control flow is a graph, not a straight line.** The validator→generator
+  and executor→generator **retry loops** with a bounded counter are conditional
+  edges — the natural LangGraph primitive. Expressing "retry up to 3 times, then
+  fail gracefully" as a hand-rolled `while` loop would scatter that logic across
+  the nodes.
+- **Durable per-conversation memory for free.** The checkpointer persists
+  `AgentState` by `thread_id`, so a follow-up ("now only for SP") resumes with the
+  prior turns — no session store to build.
+- **Deterministic and LLM steps are separate, inspectable nodes.** Routing,
+  NL→SQL, chart spec and insight use the LLM; schema injection, validation,
+  execution and analysis are pure code. Each node is unit-testable in isolation,
+  and the graph makes the data flow legible (and easy to add report-composition
+  to in Phase 5).
+- **Alternatives rejected:** a plain function pipeline (no first-class
+  branch/retry/checkpoint — we'd rebuild all three); a generic ReAct/tool-calling
+  agent (lets the LLM choose tools freely, which fights the "LLM never touches raw
+  rows / only validated SQL runs" guarantee); raw SQL string checks (a parser, not
+  regex, is required to stop injection). LangGraph keeps the LLM boxed into exactly
+  the steps we want while the guard and the database stay in control.
+
 ## 5. Configuration & security
 
 - All secrets come from `.env` (git-ignored); only `.env.example` is committed.
@@ -155,11 +224,14 @@ Run: `cd frontend && npm install && npm run dev` → http://localhost:5173
 - `DATABASE_URL` uses `cockroachdb+psycopg://` with `sslmode=verify-full`
   (root cert at `%APPDATA%\postgresql\root.crt`).
 - `DATABASE_URL_READONLY` is reserved for a dedicated read-only role for the
-  agent's SQL (Phase 3).
-- The agent's generated SQL will additionally pass a `sqlglot` validator
-  (single statement, SELECT/WITH only, table/column whitelist, enforced LIMIT) —
-  Phase 3. Phase 1's deterministic SQL does not need it but already follows the
-  same read-only / parameterized / timeout discipline.
+  agent's SQL (recommended outer boundary; the agent reads `mart.*`/`olist.*`).
+- The agent's generated SQL passes the `sqlglot` guard
+  ([guards/sql_validator.py](../backend/guards/sql_validator.py)): single
+  statement, SELECT/WITH only, table + column whitelist, enforced LIMIT, comments
+  stripped — then runs read-only with a `statement_timeout`. User chat text is
+  untrusted and can never alter the prompts or the guard. Phase 1's deterministic
+  SQL doesn't need the guard but follows the same read-only / parameterized /
+  timeout discipline.
 
 ---
 
@@ -170,7 +242,7 @@ Run: `cd frontend && npm install && npm run dev` → http://localhost:5173
 | 0 | Schema discovery → SCHEMA.md | ✅ done |
 | 1 | `mart.*` + dashboard API + tests | ✅ done |
 | 2 | React/Vite dashboard UI | ✅ done |
-| 3 | LangGraph agent + SQL guard + CLI | ⬜ planned |
+| 3 | LangGraph agent + SQL guard + CLI | ✅ done |
 | 4 | AI insights + chat in the dashboard | ⬜ planned |
 | 5 | Report composer (Markdown + PDF) | ⬜ planned |
 | 6 | Synthetic 1M rows, benchmarks, evals, README, Docker | ⬜ planned |

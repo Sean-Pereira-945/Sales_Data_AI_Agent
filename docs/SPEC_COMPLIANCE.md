@@ -79,10 +79,15 @@ KPI reflow; single-column charts on narrow screens).
 | 7 | Review distribution | ✅ | distribution/trend ✅; category via global | |
 | 8 | Seller concentration (Pareto) | 🟡 | `buckets` (5–100) instead of a "top-% slider" | full Pareto curve returned; the slider is a UI zoom over the same data |
 
-## §9 AI behaviour — ⬜ Phase 4
-Insights from aggregated results only, numbers-grounded, cached by
-`hash(chart_id+params)`, "Summarize dashboard". (The result cache and the
-no-raw-rows data shape are already in place to support it.)
+## §9 AI behaviour — 🟡 (agent core built in Phase 3; dashboard wiring in Phase 4)
+The LangGraph agent enforces the core rules already: the LLM only ever sees
+**aggregated** rows (SQL is guarded + LIMIT-enforced), the analyzer computes every
+number in Python and the insight writer is instructed to use only those numbers
+(no invented figures), insights follow the "what → why → watch" form, and
+Black-Friday detection is in the analyzer. **Pending (Phase 4):** per-chart
+`/api/insights/<id>` endpoints cached by `hash(chart_id+params)`, streaming chat
+with `thread_id` memory, and the "Summarize dashboard" button. The result cache
+(`services/cache.py`) and the agent's checkpointer memory are ready for it.
 
 ## §10 UX standards — ✅ (Phase 2)
 Implemented in the UI: every title carries its metric + unit (e.g. "GMV (R$),
@@ -96,12 +101,15 @@ loading uses shimmer skeletons and a refetch keeps the previous data visible
 
 ## Summary
 - **Built & spec-compliant now:** all source/metric/data-quality rules (§2–§6);
-  the data + API for every KPI and all 8 charts (§8); and the full dashboard UI —
-  layout (§7) and UX standards (§10).
+  the data + API for every KPI and all 8 charts (§8); the full dashboard UI —
+  layout (§7) and UX standards (§10); and the LangGraph agent core (§9 rules:
+  LLM sees only aggregated rows, numbers-grounded insights, Black-Friday
+  detection, guarded SQL).
 - **Deviations, all documented in DECISIONS.md:** rebuilt tables vs. matviews (D1);
   `daily_sales` grain + `purchase_month` (D5); source-table choices per the
   additive/distinct rule (D6); category semijoin semantics (D7); seller Pareto
   `buckets` vs. slider; revenue-by-state **bar** (spec's allowed fallback) instead
   of a choropleth map.
-- **Pending by design:** AI insights, chat & Black-Friday recognition (Phase 4);
-  reports (Phase 5); the choropleth map as a visual enhancement.
+- **Pending by design:** wiring the agent into the dashboard — per-chart insight
+  endpoints, streaming chat, "Summarize dashboard" (Phase 4); reports (Phase 5);
+  the choropleth map as a visual enhancement.

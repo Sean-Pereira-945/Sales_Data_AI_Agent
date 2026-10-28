@@ -34,3 +34,8 @@ pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
+# B008 fires on FastAPI's idiomatic Depends()/Query() in argument defaults,
+# which is the sanctioned pattern — allow it.
+ignore = ["B008"]

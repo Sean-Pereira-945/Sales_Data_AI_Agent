@@ -86,8 +86,17 @@ def get_agent():
     return _agent
 
 
+# Hard ceiling on graph steps as a backstop if the retry counter ever regressed
+# (see ARCHITECTURE_REVIEW.md §4). The normal path uses far fewer than this.
+RECURSION_LIMIT = 12
+
+
+def run_config(thread_id: str) -> dict:
+    """Shared run config: conversation thread + an explicit recursion ceiling."""
+    return {"configurable": {"thread_id": thread_id}, "recursion_limit": RECURSION_LIMIT}
+
+
 def ask(question: str, thread_id: str = "cli") -> AgentState:
     """Run one turn through the agent for the given conversation thread."""
     agent = get_agent()
-    config = {"configurable": {"thread_id": thread_id}}
-    return agent.invoke({"question": question}, config=config)
+    return agent.invoke({"question": question}, config=run_config(thread_id))

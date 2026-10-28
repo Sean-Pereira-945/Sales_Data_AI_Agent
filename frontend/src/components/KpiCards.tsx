@@ -36,7 +36,7 @@ export function KpiCards() {
     return <div className="kpi-row"><div className="error-box">Couldn’t load KPIs.</div></div>;
   }
 
-  const { cards, comparison_label } = q.data;
+  const { cards } = q.data;
 
   return (
     <>
@@ -49,19 +49,16 @@ export function KpiCards() {
           <div className="kpi" key={card.key}>
             <div className="kpi-label">{card.label}</div>
             <div className="kpi-value">{formatValue(card)}</div>
-            <div className="kpi-delta">
-              {card.delta_pct === null ? (
-                <span className="delta-muted">no prior period</span>
-              ) : (
+            {card.delta_pct !== null && (
+              <div className="kpi-delta">
                 <span className={good ? "delta-up" : "delta-down"}>
                   {up ? "▲" : "▼"} {fmtDelta(card.delta_pct)}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
           );
         })}
-        <div className="kpi-compare">vs {comparison_label ?? "—"}</div>
       </div>
       <KpiInsight />
     </>

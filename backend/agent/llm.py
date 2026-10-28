@@ -1,25 +1,47 @@
 """Provider-agnostic LLM wrapper.
 
 Model name, provider and API key come from `.env` (never hardcoded). When a real
-key is configured the agent calls Anthropic; when it is not, it falls back to a
-deterministic **stub** so the whole graph — routing, SQL generation, execution,
-analysis, insight — still runs offline (for the CLI and tests). The stub is a
-test shim, not a second "model": it does keyword routing and picks from a small
-set of SQL templates; the real NL→SQL quality comes from the Anthropic path.
+key is configured the agent calls the selected provider; when it is not, it
+falls back to a deterministic **stub** so the whole graph — routing, SQL
+generation, execution, analysis, insight — still runs offline (for the CLI and
+tests).
 """
 from __future__ import annotations
 
 import json
+import logging
 import re
+import time
 from typing import Protocol
 
 from app.config import get_settings
 
-# Default model if LLM_MODEL is unset (overridable via .env). Per the Anthropic
-# guidance, default to the current Opus unless the user picks another.
-DEFAULT_ANTHROPIC_MODEL = "claude-opus-5-5"
+logger = logging.getLogger(__name__)
+
+# Default model if LLM_MODEL is unset (overridable via .env).
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+
+# Per-call request timeout (ms) so a hung LLM call fails fast instead of blocking
+# the whole agent run (see ARCHITECTURE_REVIEW.md §4).
+LLM_TIMEOUT_MS = 30_000
+# On a quota/unavailable error, stop calling the provider for this long and serve
+# the deterministic stub instead — a lightweight circuit breaker that keeps the
+# product responsive during a 429 (see ARCHITECTURE_REVIEW.md §3).
+BREAKER_COOLDOWN_SECONDS = 300
+# Transient (503/overloaded) errors get a couple of short backoff retries.
+MAX_TRANSIENT_RETRIES = 2
 
 Purpose = str  # "intent" | "sql" | "chart_spec" | "insight"
+
+
+def _error_kind(exc: Exception) -> str:
+    """Classify a provider error as 'quota', 'transient', or 'other'."""
+    msg = str(exc).lower()
+    if "429" in msg or "resource_exhausted" in msg or "quota" in msg or "rate limit" in msg:
+        return "quota"
+    if "503" in msg or "500" in msg or "unavailable" in msg or "overloaded" in msg or "deadline" in msg:
+        return "transient"
+    return "other"
 
 
 class LLMClient(Protocol):
@@ -30,31 +52,74 @@ class LLMClient(Protocol):
 
 
 # --------------------------------------------------------------------------- #
-# Anthropic
+# Gemini
 # --------------------------------------------------------------------------- #
-class AnthropicLLM:
+class GeminiLLM:
     def __init__(self, model: str, api_key: str) -> None:
-        from anthropic import Anthropic
+        from google import genai
+        from google.genai import types
 
-        self._model = model or DEFAULT_ANTHROPIC_MODEL
-        self._client = Anthropic(api_key=api_key)
+        self._model = model or DEFAULT_GEMINI_MODEL
+        self._client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=LLM_TIMEOUT_MS),
+        )
+        self._types = types
+        self._fallback = StubLLM()
+        # Circuit-breaker state: when > now(), skip the provider and use the stub.
+        self._breaker_until = 0.0
 
     @property
     def name(self) -> str:
-        return f"anthropic:{self._model}"
+        return f"gemini:{self._model}"
+
+    @property
+    def degraded(self) -> bool:
+        """True while the breaker is open (serving the stub, not the provider)."""
+        return time.monotonic() < self._breaker_until
+
+    def _call(self, system: str, user: str, max_tokens: int) -> str:
+        response = self._client.models.generate_content(
+            model=self._model,
+            contents=user,
+            config=self._types.GenerateContentConfig(
+                system_instruction=system,
+                max_output_tokens=max_tokens,
+            ),
+        )
+        return (response.text or "").strip()
 
     def complete(self, system: str, user: str, *, purpose: Purpose = "", max_tokens: int = 2048) -> str:
-        # Plain (non-streaming) message. No temperature/thinking overrides — the
-        # current Opus models reject non-default sampling and manage thinking
-        # adaptively; small structured outputs don't need streaming.
-        resp = self._client.messages.create(
-            model=self._model,
-            max_tokens=max_tokens,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-        )
-        parts = [b.text for b in resp.content if getattr(b, "type", None) == "text"]
-        return "".join(parts).strip()
+        # Breaker open → don't spend a call on a provider we know is failing.
+        if self.degraded:
+            return self._fallback.complete(system, user, purpose=purpose, max_tokens=max_tokens)
+
+        for attempt in range(MAX_TRANSIENT_RETRIES + 1):
+            try:
+                text = self._call(system, user, max_tokens)
+                if purpose == "summary" and not _has_summary_structure(text):
+                    logger.warning("Gemini returned an incomplete summary; using deterministic fallback")
+                    break
+                if text:
+                    return text
+                logger.warning("Gemini returned an empty response; using deterministic fallback")
+                break
+            except Exception as exc:  # noqa: BLE001 - preserve dashboard/chat availability
+                kind = _error_kind(exc)
+                if kind == "quota":
+                    # Don't hammer a quota-exhausted model: trip the breaker.
+                    self._breaker_until = time.monotonic() + BREAKER_COOLDOWN_SECONDS
+                    logger.warning(
+                        "Gemini quota exhausted; serving deterministic fallback for %ss",
+                        BREAKER_COOLDOWN_SECONDS,
+                    )
+                    break
+                if kind == "transient" and attempt < MAX_TRANSIENT_RETRIES:
+                    time.sleep(0.5 * (2**attempt))  # 0.5s, 1s backoff
+                    continue
+                logger.warning("Gemini request failed (%s); using deterministic fallback", type(exc).__name__)
+                break
+        return self._fallback.complete(system, user, purpose=purpose, max_tokens=max_tokens)
 
 
 # --------------------------------------------------------------------------- #
@@ -156,8 +221,20 @@ class StubLLM:
         # The analyzer's facts are passed in the user prompt after "FACTS:".
         m = re.search(r"FACTS:\s*(.*)", user, re.DOTALL)
         facts = (m.group(1).strip() if m else "").splitlines()
-        head = facts[0] if facts else "No rows returned."
-        return f"{head} (deterministic summary — set LLM_API_KEY in .env for AI-written insights.)"
+        if not facts:
+            return "I couldn't find any matching data for that question."
+        head = facts[0].rstrip(".")
+        if len(facts) == 1:
+            return (
+                f"The data shows that {head[0].lower() + head[1:]}. "
+                "There is no additional breakdown available for this view."
+            )
+        next_fact = facts[1].rstrip(".")
+        return (
+            f"The data shows that {head[0].lower() + head[1:]}. "
+            f"This is followed by {next_fact[0].lower() + next_fact[1:]}. "
+            "That pattern is worth monitoring as the filters change."
+        )
 
     @staticmethod
     def _summary(user: str) -> str:
@@ -165,12 +242,19 @@ class StubLLM:
         lines = [ln.strip("- ").strip() for ln in (m.group(1).strip().splitlines() if m else []) if ln.strip()]
         drivers = lines[:3] or ["No data for the current filters."]
         return (
-            "Headline: Dashboard summary for the current filters (deterministic — "
-            "set LLM_API_KEY in .env for an AI-written brief).\n"
+            "Headline: Dashboard summary for the current filters.\n"
             "Drivers:\n" + "\n".join(f"- {d}" for d in drivers) + "\n"
             "Risk: Review the partial-period and low-volume caveats before acting.\n"
             "Recommendation: Open the chart with the largest movement to investigate."
         )
+
+
+def _has_summary_structure(text: str) -> bool:
+    """Require every section expected by dashboard and document consumers."""
+    return all(
+        marker in text
+        for marker in ("Headline:", "Drivers:", "Risk:", "Recommendation:")
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -183,8 +267,8 @@ def get_llm() -> LLMClient:
     global _llm
     if _llm is None:
         s = get_settings()
-        if s.llm_provider == "anthropic" and s.llm_api_key:
-            _llm = AnthropicLLM(model=s.llm_model, api_key=s.llm_api_key)
+        if s.llm_api_key and s.llm_provider == "gemini":
+            _llm = GeminiLLM(model=s.llm_model, api_key=s.llm_api_key)
         else:
             _llm = StubLLM()
     return _llm
@@ -194,3 +278,16 @@ def reset_llm_cache() -> None:
     """Testing helper."""
     global _llm
     _llm = None
+
+
+def llm_degraded() -> bool:
+    """True when the LLM is running on the deterministic fallback.
+
+    Either no provider key is configured (stub), or the circuit breaker is open
+    after a quota/availability error. The API surfaces this so the UI can tell
+    the user AI answers are temporarily degraded.
+    """
+    client = get_llm()
+    if client.name.startswith("stub"):
+        return True
+    return bool(getattr(client, "degraded", False))

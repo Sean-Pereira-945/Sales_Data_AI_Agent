@@ -16,11 +16,15 @@ from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from agent.graph import get_agent
+from agent.graph import get_agent, run_config
+from agent.llm import llm_degraded
 
 router = APIRouter()
+
+# Cap untrusted chat input to bound cost/DoS (see ARCHITECTURE_REVIEW.md §2).
+MAX_MESSAGE_CHARS = 4000
 
 _STAGE = {
     "intent_router": "routing",
@@ -35,7 +39,7 @@ _STAGE = {
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
     thread_id: str | None = None
 
 
@@ -55,7 +59,7 @@ def _rows(rows: list[dict[str, Any]], cap: int = 60) -> list[dict[str, Any]]:
 def chat(req: ChatRequest) -> StreamingResponse:
     thread_id = req.thread_id or f"web-{uuid.uuid4().hex[:8]}"
     agent = get_agent()
-    config = {"configurable": {"thread_id": thread_id}}
+    config = run_config(thread_id)
 
     def sse(obj: dict[str, Any]) -> str:
         return f"data: {json.dumps(obj)}\n\n"
@@ -83,6 +87,7 @@ def chat(req: ChatRequest) -> StreamingResponse:
             "row_count": final.get("row_count", 0),
             "data": _rows(final.get("result") or []),
             "report_id": final.get("report_id"),
+            "degraded": llm_degraded(),
         })
 
     return StreamingResponse(

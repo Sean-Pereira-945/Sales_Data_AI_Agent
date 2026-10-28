@@ -7,6 +7,7 @@ const SUGGESTIONS = [
   "Q3 regional performance",
   "Delivery & logistics review",
   "Product category deep dive",
+  "Compare GMV and late-delivery rate across the top states",
   "Customer experience & reviews",
 ];
 
@@ -40,12 +41,13 @@ export function ReportDialog({ open, onClose }: { open: boolean; onClose: () => 
         </header>
 
         <div className="modal-body">
-          <label className="field-label">Topic</label>
-          <input
+          <label className="field-label">What should the report cover?</label>
+          <textarea
             className="report-topic"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder="e.g. Q3 regional performance"
+            placeholder="e.g. Compare GMV and late-delivery rate across the top states, plus the category trend"
+            rows={2}
             disabled={busy}
           />
           <div className="report-suggestions">
@@ -56,8 +58,10 @@ export function ReportDialog({ open, onClose }: { open: boolean; onClose: () => 
             ))}
           </div>
           <p className="report-note">
-            Uses the current global filters. The agent plans sections, runs the queries,
-            renders charts, and writes the narrative.
+            Uses the current global filters. The agent plans the sections from your
+            request — mixing reliable built-in charts with topic-specific ones it
+            writes on the fly — then runs the queries, renders the charts, and writes
+            the narrative.
           </p>
 
           {error && <div className="error-box">{error}</div>}

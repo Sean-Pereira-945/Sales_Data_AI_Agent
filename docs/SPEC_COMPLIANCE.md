@@ -62,9 +62,9 @@ never override the global filters.
 
 ## §7 Layout — ✅ (Phase 2)
 Built in `frontend/`: sticky global filter bar → KPI row (6 cards) → 2-column grid
-of all 8 charts → bottom actions (`Summarize dashboard` / `Generate report`,
-disabled until Phases 4–5) → slide-in side chat panel. Responsive (3/2/1-column
-KPI reflow; single-column charts on narrow screens).
+of all 8 charts → bottom actions (`Summarize dashboard` + `Generate report`, both
+live) → slide-in side chat panel. Responsive (3/2/1-column KPI reflow;
+single-column charts on narrow screens).
 
 ## §8 Chart specifications
 | # | Chart | Data/API | Local controls | Notes |
@@ -111,6 +111,8 @@ loading uses shimmer skeletons and a refetch keeps the previous data visible
   additive/distinct rule (D6); category semijoin semantics (D7); seller Pareto
   `buckets` vs. slider; revenue-by-state **bar** (spec's allowed fallback) instead
   of a choropleth map.
-- **Pending by design:** report generation — Markdown + PDF with server-rendered
-  charts (Phase 5); synthetic 1M-row scaling, benchmarks and evals (Phase 6); the
-  choropleth map as a visual enhancement.
+- **Also built (beyond the numbered spec sections):** report generation —
+  Markdown + PDF with server-rendered charts and an LLM narrative (`/api/reports`
+  + "Generate report" dialog), Phase 5.
+- **Pending by design:** synthetic 1M-row scaling, benchmarks, evals and Docker
+  (Phase 6); the choropleth map as a visual enhancement.

@@ -197,3 +197,35 @@ control, and lets the client render a chart inline. The endpoint is a sync
 generator so FastAPI runs it in a threadpool (the blocking LLM/DB calls don't
 stall the event loop). Conversation memory is the agent's checkpointer keyed by
 `thread_id`, returned in the final event and echoed back on the next turn.
+
+---
+
+## Phase 5 — Reports
+
+### D24. matplotlib (Agg) for charts and PDF — not WeasyPrint
+The spec suggested WeasyPrint, but on Windows it needs GTK/Pango/Cairo system
+libraries that aren't guaranteed. matplotlib with the Agg backend is pure-pip and
+cross-platform, renders the charts, AND produces the PDF via `PdfPages` (cover
+page + one page per section). One dependency, no system packages, works
+everywhere the backend runs. Trade-off: the PDF layout is simpler than an
+HTML/CSS engine would give; acceptable for this report.
+
+### D25. Reports reuse the dashboard's building blocks
+`report_builder` composes the existing `services/charts` queries, the shared
+`summarize_rows` analyzer, and the insight writer — a report is the dashboard's
+own aggregations arranged into a document. Queries stay deterministic and the LLM
+still only sees aggregated facts. The narrative per section and the executive
+summary are the only LLM calls.
+
+### D26. Rule-based section planner
+`plan_sections(topic)` maps topic keywords to an ordered, de-duplicated, capped
+(≤5) set of sections. Deterministic and defensible (no risk of the LLM inventing
+a section that has no query behind it); the LLM's judgment is spent on the prose,
+where it adds value. Easy to swap for an LLM planner later.
+
+### D27. Self-contained Markdown + in-memory report store
+The Markdown embeds charts as base64 PNG data URIs so a single `.md` file is
+portable. Generated reports are kept in a small in-process dict keyed by id and
+served by `GET /api/reports/{id}.pdf|.md`. Fine for a single-process dev app; a
+multi-process/persistent deployment would back this with object storage behind
+the same endpoints.

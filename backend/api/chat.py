@@ -82,6 +82,7 @@ def chat(req: ChatRequest) -> StreamingResponse:
             "chart_spec": final.get("chart_spec"),
             "row_count": final.get("row_count", 0),
             "data": _rows(final.get("result") or []),
+            "report_id": final.get("report_id"),
         })
 
     return StreamingResponse(

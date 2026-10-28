@@ -34,8 +34,14 @@ Documentation for the Sales Intelligence Platform. Start here.
   with conversation memory and inline charts — all via `api/insights.py` and
   `api/chat.py`. See [ARCHITECTURE.md §4c](ARCHITECTURE.md#4c-ai-in-the-dashboard-phase-4).
 
-Later phases (reports, scaling/evals) are outlined in
-[ARCHITECTURE.md §6](ARCHITECTURE.md#6-phase-status) and [../PROMPTS.md](../PROMPTS.md).
+- **Phase 5 — Reports:** a `report_composer` that plans sections by topic, runs
+  the deterministic queries, renders charts server-side (matplotlib), writes the
+  narrative, and exports **Markdown + PDF** — `POST /api/reports` + download
+  endpoints, and a "Generate report" dialog in the UI. See
+  [ARCHITECTURE.md §4d](ARCHITECTURE.md#4d-reports-phase-5).
+
+The remaining phase (synthetic 1M-row scaling, benchmarks, evals, Docker) is
+outlined in [ARCHITECTURE.md §6](ARCHITECTURE.md#6-phase-status) and [../PROMPTS.md](../PROMPTS.md).
 
 ## Run it
 

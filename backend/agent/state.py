@@ -31,6 +31,7 @@ class AgentState(TypedDict, total=False):
     chart_spec: dict[str, Any] | None
     insight: str
     report_sections: list[dict[str, Any]]   # Phase 5
+    report_id: str
 
     # Conversation memory (persisted by the checkpointer)
     messages: list[dict[str, str]]

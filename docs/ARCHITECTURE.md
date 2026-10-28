@@ -7,11 +7,11 @@ through it. Companion docs: [SCHEMA.md](SCHEMA.md) (raw tables),
 [SPEC_COMPLIANCE.md](SPEC_COMPLIANCE.md) (spec → code status),
 [DECISIONS.md](DECISIONS.md) (why each choice).
 
-> **Status:** Phases 0–4 are built — schema discovery, the data layer + dashboard
-> API, the React dashboard UI, the LangGraph agent + SQL guard + CLI, and the AI
-> features wired into the dashboard (per-chart insights, "Summarize dashboard",
-> and streaming chat). Reports and the scaling/eval work are later phases —
-> marked _(planned)_ below.
+> **Status:** Phases 0–5 are built — schema discovery, the data layer + dashboard
+> API, the React dashboard UI, the LangGraph agent + SQL guard + CLI, the AI
+> features in the dashboard (per-chart insights, "Summarize dashboard", streaming
+> chat), and the report composer (Markdown + PDF). The scaling/eval/Docker work
+> (Phase 6) is the remaining phase — marked _(planned)_ below.
 
 ---
 
@@ -242,6 +242,27 @@ doesn't fire an LLM call per card; the chat panel ([useChat](../frontend/src/hoo
 consumes the SSE stream and renders inline charts. Every insight still obeys the
 core rule — the LLM only ever sees aggregated numbers.
 
+## 4d. Reports (Phase 5)
+
+The `report` intent branches from `intent_router` to a **report_composer** node;
+the dashboard's "Generate report" button hits the same builder with the current
+filters ([services/report_builder.py](../backend/services/report_builder.py),
+[api/reports.py](../backend/api/reports.py)).
+
+Pipeline: **plan sections** (rule-based, by topic keywords — e.g. a regional topic
+→ trend + revenue-by-state + late-by-state, capped at 5) → run the **deterministic
+chart queries** (reusing `services/charts`) → **render charts server-side** with
+matplotlib (Agg backend, no system deps) → write a **numbers-grounded narrative**
+per section + an **executive summary** (headline / 3 drivers / 1 risk / 1
+recommendation) → assemble **Markdown** (charts embedded as base64 PNGs, one
+self-contained file) and a **PDF** (matplotlib `PdfPages`: cover + one page per
+section).
+
+`POST /api/reports` returns the report metadata + Markdown and URLs to download
+`GET /api/reports/{id}.pdf` and `.md`. Reports are held in an in-process store
+(dev; single process). A chat message with the `report` intent also returns a
+`report_id` with inline download links.
+
 ## 5. Configuration & security
 
 - All secrets come from `.env` (git-ignored); only `.env.example` is committed.
@@ -269,5 +290,5 @@ core rule — the LLM only ever sees aggregated numbers.
 | 2 | React/Vite dashboard UI | ✅ done |
 | 3 | LangGraph agent + SQL guard + CLI | ✅ done |
 | 4 | AI insights + chat in the dashboard | ✅ done |
-| 5 | Report composer (Markdown + PDF) | ⬜ planned |
+| 5 | Report composer (Markdown + PDF) | ✅ done |
 | 6 | Synthetic 1M rows, benchmarks, evals, README, Docker | ⬜ planned |

@@ -4,6 +4,7 @@ import { GlobalFilterBar } from "../components/GlobalFilterBar";
 import { KpiCards } from "../components/KpiCards";
 import { PartialPeriodWarning } from "../components/PartialPeriodWarning";
 import { ChatPanel, ChatToggle } from "../components/ChatPanel";
+import { ReportDialog } from "../components/ReportDialog";
 import { TrendChart } from "../components/charts/TrendChart";
 import { TopCategoriesChart } from "../components/charts/TopCategoriesChart";
 import { RevenueByStateChart } from "../components/charts/RevenueByStateChart";
@@ -15,6 +16,7 @@ import { SellerConcentrationChart } from "../components/charts/SellerConcentrati
 
 export function Dashboard() {
   const [chatOpen, setChatOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const chat = useChat();
 
   const onSummarize = () => {
@@ -58,10 +60,10 @@ export function Dashboard() {
           <button className="btn" type="button" onClick={onSummarize} disabled={chat.busy}>
             Summarize dashboard
           </button>
-          <button className="btn-ghost" type="button" disabled title="Phase 5">
+          <button className="btn-ghost" type="button" onClick={() => setReportOpen(true)}>
             Generate report
           </button>
-          <span className="actions-note">Reports arrive in Phase 5.</span>
+          <span className="actions-note">AI summary &amp; downloadable PDF/Markdown reports.</span>
         </div>
       </main>
 
@@ -72,6 +74,7 @@ export function Dashboard() {
         busy={chat.busy}
         onSend={chat.send}
       />
+      <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} />
     </div>
   );
 }

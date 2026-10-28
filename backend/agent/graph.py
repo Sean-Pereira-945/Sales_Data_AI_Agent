@@ -28,6 +28,10 @@ def _after_execution(state: AgentState) -> str:
     return "retry" if state.get("retries", 0) < MAX_RETRIES else "fail"
 
 
+def _after_intent(state: AgentState) -> str:
+    return "report" if state.get("intent") == "report" else "query"
+
+
 def build_graph(checkpointer=None):
     g = StateGraph(AgentState)
 
@@ -39,10 +43,16 @@ def build_graph(checkpointer=None):
     g.add_node("analyzer", nodes.analyzer)
     g.add_node("chart_spec", nodes.chart_spec_node)
     g.add_node("insight_writer", nodes.insight_writer)
+    g.add_node("report_composer", nodes.report_composer)
     g.add_node("fail", nodes.fail)
 
     g.add_edge(START, "intent_router")
-    g.add_edge("intent_router", "schema_context")
+    g.add_conditional_edges(
+        "intent_router",
+        _after_intent,
+        {"report": "report_composer", "query": "schema_context"},
+    )
+    g.add_edge("report_composer", END)
     g.add_edge("schema_context", "sql_generator")
     g.add_edge("sql_generator", "sql_validator")
 

@@ -129,4 +129,16 @@ export interface ChatFinal {
   chart_spec: ChartSpec | null;
   row_count: number;
   data: Record<string, unknown>[];
+  report_id: string | null;
+}
+
+export interface ReportResponse {
+  id: string;
+  title: string;
+  topic: string;
+  created_at: string;
+  sections: string[];
+  markdown: string;
+  pdf_url: string;
+  markdown_url: string;
 }

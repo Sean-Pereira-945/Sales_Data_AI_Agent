@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { reportDownloadUrl } from "../api/reports";
 import type { ChatMessage } from "../hooks/useChat";
 import { InlineChart } from "./InlineChart";
 
@@ -58,6 +59,12 @@ export function ChatPanel({
             ) : (
               <>
                 <div className="chat-text">{m.text}</div>
+                {m.reportId && (
+                  <div className="chat-downloads">
+                    <a className="btn" href={reportDownloadUrl(`/api/reports/${m.reportId}.pdf`)} target="_blank" rel="noreferrer">PDF</a>
+                    <a className="btn-ghost" href={reportDownloadUrl(`/api/reports/${m.reportId}.md`)} target="_blank" rel="noreferrer">Markdown</a>
+                  </div>
+                )}
                 {m.chart && <InlineChart spec={m.chart.spec} data={m.chart.data} />}
                 {m.sql && (
                   <details className="chat-sql">

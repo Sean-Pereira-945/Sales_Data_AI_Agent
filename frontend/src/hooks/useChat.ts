@@ -11,6 +11,7 @@ export interface ChatMessage {
   status?: string;                 // transient "running query…" while streaming
   sql?: string | null;
   chart?: { spec: ChartSpec; data: Record<string, unknown>[] } | null;
+  reportId?: string | null;
 }
 
 let _seq = 0;
@@ -49,6 +50,7 @@ export function useChat() {
             text: f.insight || "(no answer)",
             sql: f.sql,
             chart: f.chart_spec && f.data?.length ? { spec: f.chart_spec, data: f.data } : null,
+            reportId: f.report_id,
           });
         },
         onError: (m) => patchLast({ status: undefined, text: `⚠️ ${m}` }),

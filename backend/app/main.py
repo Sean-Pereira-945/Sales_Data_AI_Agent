@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.chat import router as chat_router
 from api.dashboard import router as dashboard_router
 from api.insights import router as insights_router
+from api.reports import router as reports_router
 
 app = FastAPI(
     title="Sales Intelligence Platform API",
@@ -31,6 +32,7 @@ app.add_middleware(
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(insights_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+app.include_router(reports_router, prefix="/api")
 
 
 @app.get("/health", tags=["meta"])

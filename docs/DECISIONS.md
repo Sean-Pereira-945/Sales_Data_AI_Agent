@@ -3,6 +3,9 @@
 Rationale for non-obvious choices, so each can be defended in the interview.
 Newest phase last.
 
+See also: [ARCHITECTURE.md](ARCHITECTURE.md) · [API.md](API.md) ·
+[SPEC_COMPLIANCE.md](SPEC_COMPLIANCE.md).
+
 ---
 
 ## Phase 1 — Data layer & dashboard API

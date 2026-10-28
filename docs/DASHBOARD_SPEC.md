@@ -1,5 +1,10 @@
 # Dashboard Specification — Olist Sales Intelligence
 
+> **Implementation status:** this spec is the product contract. Section-by-section
+> build status (what is done, deviations, and what is pending a later phase) is
+> tracked in [SPEC_COMPLIANCE.md](SPEC_COMPLIANCE.md). See also
+> [ARCHITECTURE.md](ARCHITECTURE.md) and [API.md](API.md).
+
 Source: CockroachDB, database `defaultdb`, schema `olist` (NOT `public`). Ignore the unused `brazilian_ecom` database.
 Currency: BRL (R$). Label it on every monetary figure.
 
